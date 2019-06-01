@@ -44,13 +44,13 @@ Currently, the only usable activation function for back propagation is the sigmo
 
 ## Resources
 - Matt Mazur's [Blog Post](https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/)
-- I suggest grabbing a pen and paper and read this blog post to wrap your head around the math first and then looking at the code here for help implementing it as code
+  - I suggest grabbing a pen and paper and read this blog post to wrap your head around the math first and then looking at the code here for help implementing it as code
 
 - Jabrils' Machine Learning Game series (4 Parts) [Playlist](https://www.youtube.com/watch?v=ZX2Hyu5WoFg&list=PL0nQ4vmdWaA0mzW4zPffYnaRzzO7ZqDZ0)
-- I found these videos very informative and helped get a visual understanding how neural networks worked.
+  - I found these videos very informative and helped get a visual understanding how neural networks worked.
 
 - [GitBook](https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/neural_networks.html)
-- This website uses an old deprecated CDN of MathJax so the equations are not visible, which will make things confusing. If you are using Chrome I suggest downloading the [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en) addon and adding this script
+  - This website uses an old deprecated CDN of MathJax so the equations are not visible, which will make things confusing. If you are using Chrome I suggest downloading the [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo?hl=en) addon and adding this script
 
 ```// ==UserScript==
 // @name         MathJax CDN

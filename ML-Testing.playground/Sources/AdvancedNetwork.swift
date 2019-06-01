@@ -2,6 +2,7 @@ import Foundation
 import Accelerate
 import simd
 
+/// BNNS set up with back propagation. It seems to take way more passes than the other networks and ends up with drastically different weights, but it does end up getting the right answer
 open class AdvancedNetwork: NSObject {
     private var filter: BNNSFilter?
     private var outFilter: BNNSFilter?
@@ -28,19 +29,68 @@ open class AdvancedNetwork: NSObject {
     }
     
     public func train () {
-//        var totalError: Float = 2
-//        var passes = 0
-//        var minError: Float = 0.00005
+        var totalError: Float = 2
+        var passes = 0
+        var minError: Float = 0.00005
         
-//        while totalError > minError {
-//            /** Forward Pass */
-//        }
+        while totalError > minError {
+            /** Forward Pass */
+            let output = self.forward()
+            
+            self.cleanup()
+            
+            /** Back propagation */
+            totalError = self.error(output: output.1)
+            
+            let dsdo: [Float] = [Activation.partialSigmoid(output.1[0]),
+                                 Activation.partialSigmoid(output.1[1])]
+            let t: [Float] = [ ((output.1[0]-expected[0]) * dsdo[0]), // 5,6
+                ((output.1[1]-expected[1]) * dsdo[1]) ] // 7,8
+            let pEwO: [Float] = [
+                (t[0] * output.0[0]), (t[0] * output.0[1]), // 5, 6
+                (t[1] * output.0[0]), (t[1] * output.0[1]) // 7, 8
+            ]
+            
+            let oWeights: [Float] = [
+                (self.weights[1][0]-n*pEwO[0]), (self.weights[1][1]-n*pEwO[1]), // w5, w6
+                (self.weights[1][2]-n*pEwO[2]), (self.weights[1][3]-n*pEwO[3]) // w7, w8
+            ]
+            
+            let pEwH: [Float] = [ ((output.1[0]-expected[0]) * dsdo[0]),
+                                  ((output.1[1]-expected[1]) * dsdo[1]) ]
+            
+            let h1Error = (pEwH[0] * weights[1][0]) + (pEwH[1] * weights[1][2])
+            let h2Error = (pEwH[0] * weights[1][1]) + (pEwH[1] * weights[1][3])
+            
+            let dsdh: [Float] = [Activation.partialSigmoid(output.0[0]),
+                                 Activation.partialSigmoid(output.0[1])]
+            
+            let pEwI: [Float] = [
+                (h1Error * dsdh[0] * inputs[0]), (h1Error*dsdh[0] * inputs[1]),
+                (h2Error * dsdh[1] * inputs[0]), (h2Error*dsdh[1] * inputs[1])
+            ]
+            
+            let hWeights: [Float] = [
+                (self.weights[0][0]-n*pEwI[0]), (self.weights[0][1]-n*pEwI[1]),
+                (self.weights[0][2]-n*pEwI[2]), (self.weights[0][3]-n*pEwI[3])
+            ]
+            
+            self.weights = [oWeights, hWeights]
+            
+            passes += 1
+        }
         
-        let output = self.forward()
-        print(output)
+        print("Advanced Network Training; Passes:", passes, "Error:", minError*100, "%")
+        print("Final weights:", self.weights)
+        
+        print("Results:", self.forward(), "Expected:", self.expected)
     }
     
     private func forward () -> ([Float], [Float]) {
+        if self.filter == nil || self.outFilter == nil {
+            self.updateFilter()
+        }
+        
         var hOutput: [Float] = [ 0, 0 ]
         var output: [Float] = [ 0, 0 ]
         
@@ -84,5 +134,24 @@ open class AdvancedNetwork: NSObject {
         var oDescr = BNNSVectorDescriptor(size: 2, data_type: BNNSDataType.float)
         
         self.outFilter = BNNSFilterCreateFullyConnectedLayer(&aDescr, &oDescr, &oParam, nil)
+    }
+    
+    public func cleanup () {
+        BNNSFilterDestroy(self.filter)
+        BNNSFilterDestroy(self.outFilter)
+        
+        self.filter = nil
+        self.outFilter = nil
+    }
+    
+    private func error (output o: [Float]) -> Float {
+        let e1 = 0.5 * pow(expected[0]-o[0], 2)
+        let e2 = 0.5 * pow(expected[1]-o[1], 2)
+        
+        return e1+e2
+    }
+    
+    deinit {
+        self.cleanup()
     }
 }

@@ -34,9 +34,9 @@ open class BetterNetwork: NSObject {
             
             passes += 1
         }
-        
+    
         print("Better Network Training; Passes:", passes, "Error:", minError*100, "%")
-        print("Final weights:", self.weights)
+        print("Final weights:", self.weights.transpose)
     }
     
     private func forward (_ input: SIMD2<Float>, range r: ClosedRange<Int>, bias b: Int) -> SIMD2<Float> {
@@ -61,8 +61,9 @@ open class BetterNetwork: NSObject {
         let newWeights78 = self.weights.transpose[3] - n * (pEwN[1]*o[0])
         
         // get error of hidden layer
-        let hiddenError = pEwN * self.weights[0].highHalf
-        let hTotalError = VectorMath.sum_v2(hiddenError)
+        let hiddenError1 = pEwN * self.weights[0].highHalf
+        let hiddenError2 = pEwN * self.weights[1].highHalf
+        let hTotalError = float2([VectorMath.sum_v2(hiddenError1), VectorMath.sum_v2(hiddenError2)])
         
         let dsdh = Activation.v_partialSigmoid(o[0])
         let pEwH = hTotalError * dsdh

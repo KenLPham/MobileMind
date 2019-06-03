@@ -6,6 +6,7 @@ open class VectorMath: NSObject {
     public typealias Function = (Float)->(Float)
     public typealias Function_D = (Double)->(Double)
     public typealias Function_F2 = (SIMD2<Float>)->(SIMD2<Float>)
+    public typealias Function_F3 = (SIMD3<Float>)->(SIMD3<Float>)
     
     public class func norm_d (_ a: [Double]) -> Double {
         var n = Int32(a.count)
@@ -34,6 +35,10 @@ open class VectorMath: NSObject {
         return simd_dot(a, b)
     }
     
+    public class func dot (_ a: SIMD3<Float>, _ b: SIMD3<Float>) -> Float {
+        return simd_dot(a, b)
+    }
+    
     public class func similarity_d (_ a: [Double], _ b: [Double]) -> Double {
         return dot_d(a, b) / (norm_d(a) * norm_d(b))
     }
@@ -44,7 +49,7 @@ open class VectorMath: NSObject {
         return (f(x+h) - f(x))/h
     }
     
-    public class func derivative (of f: @escaping Function, at x: Float) -> Float {
+    public class func derivative (of f: Function, at x: Float) -> Float {
         let h: Float = 1e-6
         return (f(x+h) - f(x))/h
     }
@@ -56,8 +61,27 @@ open class VectorMath: NSObject {
         return (vectorA * vectorB).results()
     }
     
+    public class func mul_f3x2 (_ a: SIMD2<Float>, _ b: float3x2) -> float3x2 {
+        let x = a[0] * b.transpose[0]
+        let y = a[1] * b.transpose[1]
+        
+        return float3x2(rows: [x, y])
+    }
+    
+    public class func mul_f3x3 (_ a: SIMD3<Float>, _ b: SIMD3<Float>) -> float3x3 {
+        let x = a[0] * b
+        let y = a[1] * b
+        let z = a[2] * b
+        
+        return float3x3(columns: (x, y, z))
+    }
+    
     public class func sum_v2 (_ a: SIMD2<Float>) -> Float {
         return self.dot(a, float2(repeating: 1))
+    }
+    
+    public class func sum_f3 (_ a: SIMD3<Float>) -> Float {
+        return self.dot(a, float3(repeating: 1))
     }
 }
 

@@ -1,101 +1,18 @@
 import Foundation
 import Accelerate
-
-/*
- Input
- - r (int), g (int), b (int)
- Output
- - int
- Train
- - Compute error: Check expected output, back propagate and adjust weights and bias
- */
+import simd
 
 public struct Color {
-    let r: Int
-    let g: Int
-    let b: Int
+    let r: Float
+    let g: Float
+    let b: Float
     
     public func array () -> [Float] {
-        return [Float(r), Float(g), Float(b)]
-    }
-}
-
-struct Model {
-    public static var fnc: ([Float], [Float]) -> (a: Float, z: [Float]) = { (input, weights) in
-        let z: [Float] = VectorMath.multiply3(input, weights)
-        /// a(z+b) b= bias
-        return (Activation.relu(z.reduce(0, +)), z)
+        return [(r/255), (g/255), (b/255)]
     }
     
-    var layers: [Layer]
-    
-    public init () {
-        layers = []
-    }
-}
-
-struct Layer {
-    private var size: Int
-    
-    var neurons: [Neuron]
-    var error: Float
-    
-    public init (output size: Int) {
-        self.neurons = []
-        self.size = size
-        self.error = 0
-    }
-    
-    /// Returns the neurons activation output
-    public func results () -> [Float] {
-        return neurons.map({ $0.data.a })
-    }
-    
-    public mutating func activate (_ input: [Float]) {
-        for _ in 0..<self.size {
-            var neuron = Neuron()
-            neuron.data = Model.fnc(input, neuron.getWeights())
-            print(neuron.data)
-            
-            neurons.append(neuron)
-        }
-    }
-    
-//    public mutating func xy () {
-//
-//    }
-}
-
-struct Neuron {
-    private var weights: [Float]
-    var data: (a: Float, z: [Float])
-    
-    public init () {
-        self.weights = []
-        self.data = (0, [])
-    }
-    
-    public mutating func getWeights () -> [Float] {
-        if weights.isEmpty { self.weights = self.randomizeWeights() }
-        return self.weights
-    }
-    
-    public func dA () -> Float {
-        return VectorMath.derivative(of: Activation.relu, at: data.z.reduce(0, +))
-    }
-    
-//    public func error (partial p: Float) -> [Float] {
-//
-//    }
-    
-    private func randomizeWeights (epsilon e: Float = 2) -> [Float] {
-        let thetas = [
-            Float.random(in: 10...11) * (2 * e) - e,
-            Float.random(in: 5...11) * (2 * e) - e,
-            Float.random(in: 1...11) * (2 * e) - e
-        ]
-        
-        return thetas
+    public func simd_float () -> SIMD3<Float> {
+        return float3(self.array())
     }
 }
 
@@ -104,6 +21,13 @@ struct Neuron {
  - https://leonardoaraujosantos.gitbooks.io/artificial-inteligence/content/neural_networks.html
  */
 open class ColorNetwork: NSObject {
+    public typealias InputWeight = SIMD3<Float>
+    /// h1, h2, h3
+    public typealias IOutput = SIMD3<Float>
+    /// h4, h5
+    public typealias HOutput = SIMD2<Float>
+    public typealias Output = (`in`: IOutput, h: HOutput, o: Float)
+    
     private var trainingSet: [Color] = [
         Color(r: 0, g: 0, b: 0),
         Color(r: 255, g: 0, b: 0),
@@ -115,60 +39,115 @@ open class ColorNetwork: NSObject {
         Color(r: 255, g: 255, b: 255)
     ]
     
-    private var model: Model!
+    var inputWeights = float3x3([
+        float3(x: 0.1, y: 0.3, z: 0.24), // w1, w2, w3
+        float3(x: 0.32, y: 0.5, z: 0.14), // w4, w5, w6
+        float3(x: 0.27, y: 0.7, z: 0.63) // w7, w8, w9
+    ])
+    var inputBias = float3(x: 0.2, y: 0.5, z: 0.1)
     
-    public override init () {
-        super.init()
-        
-        self.model = Model()
-    }
+    var hiddenWeights = float3x2([
+        float2(x: 0.67, y: 0.28), // w10, w11
+        float2(x: 0.21, y: 0.45), // w12, w13
+        float2(x: 0.53, y: 0.55) // w14, w15
+    ])
+    var hiddenBias = float2(x: 0.25, y: 0.3)
     
-    /** Training
-     1. Initialize weights randomly
-     2. For each epoch
-        - Epoch = a complete pass into all elements of your training set
-     3. Do the forward propagation
-        - You can calculate the output of the whole layer as a matrix multiplication followed by a element-wise activation function
-     4. Calculate loss
-     5. Do the backward propagation
-     6. Update weights with Gradient descent (Optionally use gradient checking to verify backpropagation)
-     7. Go to step 2 until you finish all epochs
-     */
+    var outputWeights = float2(x: 0.62, y: 0.18) // w16, w17
+    var outputBias: Float = 0.05
+    
+    /// Learning rate
+    var n: Float = 0.5
+    
     public func train () {
-        /// Step 2
-        for color in self.trainingSet {
-            /// Step 3 - Forward
-            var hiddenLayer = Layer(output: 3)
-            hiddenLayer.activate(color.array())
-            
-            /// Output
-            var outputLayer = Layer(output: 1)
-            outputLayer.activate(hiddenLayer.results())
-            
-            let expected = self.expectedOutput(color)
-            print("h_theta(x)", outputLayer.results(), "expected", expected)
-            
-            /// Step 4 - Loss
-            
-            /// Step 5 - Backward
-            self.backwards(result: outputLayer.results()[0], expected: expected, layer: hiddenLayer)
-            /// Step 6 - Update weights
+        var passes = 0
+        var totalError: Float = 2
+        let minError: Float = 0.000001
+        
+//        let color = trainingSet[7]
+//        let expected = self.expectedOutput(color)
+        
+        while totalError > minError {
+            for color in self.trainingSet {
+                let expected = self.expectedOutput(color)
+                
+                // Forward Pass
+                /// [0] = h1, [1] = h2, [2] = h3
+                let output = self.forward(input: color)
+                
+                // Backwards Pass
+                totalError = self.error(input: expected, output: output.o)
+                
+                let newWeights = self.backprop(input: color.simd_float(), results: output, expected: expected)
+                
+                // Update weights
+                self.inputWeights = newWeights.in
+                self.hiddenWeights = newWeights.hidden
+                self.outputWeights = newWeights.out
+                
+                passes += 1
+            }
         }
+        
+        print("Basic Network Training; Passes:", passes, "Error:", minError*100, "%")
+        print("Final weights:\nInput:", self.inputWeights, "\nHiddne:", self.hiddenWeights, "\nOutput:", self.outputWeights)
+//        print("actual:", forward(input: color).o, "expected:", expected)
     }
     
-    private func backwards (result o: Float, expected e: Float, layer l: Layer) {
-        let outError = e - o //p(3)
+    public func apply (_ color: Color) -> Float {
+        return self.forward(input: color).o
+    }
+    
+    private func forward (input color: Color) -> Output {
+        let a = self.inputForward(input: color)
+        let a1 = self.hiddenForward(input: a)
+        let output = self.outputForward(input: a1)
         
-        var layerError: [Float] = []
+        return (a, a1, output)
+    }
+    
+    private func inputForward (input color: Color) -> IOutput {
+        let z = self.inputWeights * color.simd_float() + self.inputBias
+        return Activation.relu_f3(z)
+    }
+    
+    private func hiddenForward (input a: IOutput) -> HOutput {
+        let z = a * hiddenWeights.transpose + self.hiddenBias
+        return Activation.relu_f2(z)
+    }
+    
+    private func outputForward (input a: HOutput) -> Float {
+        let z = VectorMath.dot(a, self.outputWeights) + self.outputBias
+        return Activation.relu(z)
+    }
+    
+    private func backprop (input i: SIMD3<Float>, results r: Output, expected e: Float) -> (in: float3x3, hidden: float3x2, out: float2) {
+        let dsdo = Activation.partialRelu(r.o)
         
-        for neuron in l.neurons {
-            var copy = neuron
-            let vectorWeights = SIMD3(copy.getWeights())
-            
-            layerError = (vectorWeights * neuron.dA()).results()
-        }
+        // Output Layer
+        let loss = r.o-e
+        let cost = loss*dsdo
         
-        print("output error:", outError, "layer 1 error:", layerError)
+        let pEwO = cost*r.h
+        let wO = self.outputWeights-n*pEwO
+        
+        // Hidden 2 Layer
+        let eo1os: float2 = loss * self.outputWeights
+        let dsdh45: float2 = Activation.partialRelu_f2(r.h)
+        
+        let eoh45 = eo1os * dsdh45
+        let pEh45 = float2x3([ (eoh45[0] * r.in), (eoh45[1] * r.in) ])
+        let wHL2 = (self.hiddenWeights.transpose - n*pEh45).transpose // Transpose to be in the same order
+        
+        // Hidden 1 Layer
+        let eht: float3 = eoh45 * self.hiddenWeights
+        let dsdh = Activation.partialRelu_f3(r.in)
+        let ehd = eht * dsdh
+        let pEh = VectorMath.mul_f3x3(ehd, i)
+        
+        let wH: float3x3 = (self.inputWeights.transpose - n*pEh).transpose
+        
+        return (wH, wHL2, wO)
     }
     
     /** Genetic Algorithm
@@ -182,12 +161,20 @@ open class ColorNetwork: NSObject {
         
     }
     
+    private func error (input e: Float, output o: Float) -> Float {
+        return 0.5*pow(e - o, 2)
+    }
+    
     private func expectedOutput (_ color: Color) -> Float {
         let weights: [Float] = [ 299, 587, 114 ]
         return VectorMath.dot(color.array(), weights)/1000
     }
     
     public func testing () {
-        self.train()
+        for color in trainingSet {
+            let expected = self.expectedOutput(color)
+            
+            print("actual", self.apply(color), "expected", expected)
+        }
     }
 }

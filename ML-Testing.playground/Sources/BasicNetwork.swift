@@ -63,13 +63,13 @@ open class BasicNetwork: NSObject {
             let pEo1: Float = outputLayerOut.0 - expected[0] // 0.7413651
             let eo1no1: Float = pEo1 * dsdo1 // 0.13849856
             
-            let eo1o1: Float = eo1no1 * weights[1][0] // 0.055399425
+            let eo1o1: Float = eo1no1 * weights[1][0] // w5; 0.055399425
             
             /// Error of neuron 1 with output 2
             let pEo2: Float = outputLayerOut.1 - expected[1]
             let eo2no2: Float = pEo2 * dsdo2
             
-            let eo2o2: Float = eo2no2 * weights[1][2] // -0.019049117
+            let eo2o2: Float = eo2no2 * weights[1][2] // w7; -0.019049117
             
             /// Error of neuron 1
             let etn1: Float = eo1o1 + eo2o2 // 0.03635031

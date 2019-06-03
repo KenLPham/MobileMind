@@ -31,7 +31,7 @@ open class AdvancedNetwork: NSObject {
     public func train () {
         var totalError: Float = 2
         var passes = 0
-        var minError: Float = 0.00005
+        let minError: Float = 0.00005
         
         while totalError > minError {
             /** Forward Pass */
